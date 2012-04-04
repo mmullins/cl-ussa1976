@@ -1,0 +1,164 @@
+#+TITLE: US Standard Atmosphere, 1976 in Common Lisp
+#+AUTHOR: Mayes Mullins
+#+STARTUP: showall
+
+* INTRODUCTION
+
+This is a Common Lisp implementation of the US Standard Atmosphere, 1976.
+
+This atmosphere model is documented in "US Standard Atmosphere, 1976", NOAA-S/T 76-1562
+(referred to below as "the standard").
+
+This implementation includes all the information in Part 1 of the standard, i.e., all of the defined
+properties dependent on the major consituents of the dry atmosphere, N_2, O, O_2, Ar, He, H.  It does
+not include any information on the trace constituents described in Part 3 of the standard.
+
+There is a function to return each property defined in the standard as a function of geometric
+altitude, Z.  This is the 'real' altitude.  There is also a function to return each property as a
+function of geopotential altitude, H.  Geopotential altitudes are defined by the change in
+gravitational potential energy divided by an assumed constant acceleration of gravity.  Because
+gravity actually decreases with altitude, the H value for a (positive) altitude is less than the
+geometric altitude, Z.  Geopotential altitude is probably of less interest than geometric altitude in
+most applications.  In the notes below, "altitude" refers to geometric altitude.
+
+* EXAMPLES
+
+- Tabulate temperature, pressure and density at some altitudes:
+
+#+BEGIN_SRC lisp -n
+(use-package '("CL-USSA1976"))
+(format t "~12@a ~12@a ~12@a ~12@a~%" "Z" "T" "P" "rho")
+(format t "~12@a ~12@a ~12@a ~12@a~%" "[m]" "[K]" "[Pa]" "[kg/m^3]")
+(loop for z from 0 to 100000 by 10000
+  do (format t "~12,0f ~12,1f ~12,4e ~12,4e~%" Z (T-at-Z Z) (P-at-Z Z) (rho-at-Z Z)))
+(loop for z from 200000 to 1000000 by 200000
+  do (format t "~12,0f ~12,1f ~12,4e ~12,4e~%" Z (T-at-Z Z) (P-at-Z Z) (rho-at-Z Z)))
+#+END_SRC
+==>
+#+BEGIN_EXAMPLE
+           Z            T            P          rho
+         [m]          [K]         [Pa]     [kg/m^3]
+          0.        288.1    1.0132d+5    1.2250d+0
+      10000.        223.3    2.6500d+4    4.1351d-1
+      20000.        216.6    5.5293d+3    8.8910d-2
+      30000.        226.5    1.1970d+3    1.8410d-2
+      40000.        250.3    2.8714d+2    3.9957d-3
+      50000.        270.6    7.9779d+1    1.0269d-3
+      60000.        247.0    2.1959d+1    3.0968d-4
+      70000.        219.6    5.2209d+0    8.2829d-5
+      80000.        198.6    1.0525d+0    1.8458d-5
+      90000.        186.9    1.8359d-1    3.4163d-6
+     100000.        195.1    3.2012d-2    5.6042d-7
+     200000.        854.6    8.4736d-5   2.5407d-10
+     400000.        995.8    1.4518d-6   2.8027d-12
+     600000.        999.9    8.2128d-8   1.1367d-13
+     800000.       1000.0    1.7035d-8   1.1358d-14
+    1000000.       1000.0    7.5133d-9   3.5605d-15
+#+END_EXAMPLE
+
+- What was the Mach number, Reynolds number and dynamic pressure on the 37 meter long Space Shuttle
+  Orbiter as it passed 60 km altitude at 4400 m/s during reentry:
+
+#+BEGIN_SRC lisp -n
+(let* ((l 37)              ;length in meters
+       (Z 60000)           ;altitude in meters
+       (v 4400)            ;speed in m/s
+       (C_s (C_s-at-Z Z))  ;speed of sound
+       (rho (rho-at-Z Z))  ;density
+       (eta (eta-at-Z Z))  ;kinematic viscosity
+       )
+  (format t "M = ~5,1f, Re = ~6,2e, q = ~6,0f Pa~%"
+          (/ V C_s) (/ (* v l) eta) (* 0.5 rho v v)))
+#+END_SRC
+==>
+#+BEGIN_EXAMPLE
+M =  14.0, Re = 3.18d+6, q =  2998. Pa
+#+END_EXAMPLE
+
+
+* FUNCTIONS
+
+Function and variable names follow the standard with underscores introducing subscripts.  This leads
+to "non-lispy" names in some cases, but matches the standard more closely.
+
+Altitudes are in meters, and properties are in appropriate SI units.
+
+Functions for each defined property as a function of geometric altitude, Z, are:
+
+#+ATTR_HTML: border="2" rules="all" frame="all"
+|------------------+------------------------------------------------------------------------|
+| Function         | Property                                                               |
+|------------------+------------------------------------------------------------------------|
+| =g-at-Z=         | acceleration of gravity [m/s^{2}]                                      |
+| =M/M_0-at-Z=     | molecular weight / sea level molecular weight                          |
+| =M-at-Z=         | molecular weight                                                       |
+| =T-at-Z=         | temperature [K]                                                        |
+| =T_M-at-Z=       | molecular-scale temperature [K]                                        |
+| =n-at-Z=         | total particle number density [/m^{3}]                                 |
+| =n_N2-at-Z=      | N_2 (molecular nitrogen) number density [/m^{3}]                       |
+| =n_O-at-Z=       | O (atomic oxygen) number density [/m^{3}]                              |
+| =n_O2-at-Z=      | O_2 (molecular oxygen) number density [/m^{3}]                         |
+| =n_Ar-at-Z=      | Ar (argon) number density [/m^{3}]                                     |
+| =n_He-at-Z=      | He (helium) number density [/m^{3}]                                    |
+| =n_H-at-Z=       | H (atomic hydrogen) number density [/m^{3}]                            |
+| =v-n_X-at-Z=     | vector of number density for N_2, O, O_2, Ar, He, H and total [/m^{3}] |
+| =P-at-Z=         | pressure [Pa]                                                          |
+| =P/P_0-at-Z=     | pressure / sea level pressure                                          |
+| =rho-at-Z=       | density [kg/m^{3}]                                                     |
+| =rho/rho_0-at-Z= | density / sea level density                                            |
+| =v_m-at-Z=       | mole volume [m^{3}]                                                    |
+| =H_P-at-Z=       | pressure scale height [m]                                              |
+| =H_rho-at-Z=     | density scale height [m]                                               |
+| =V-at-Z=         | mean particle speed [m/s]                                              |
+| =L-at-Z=         | mean free path [m]                                                     |
+| =nu-at-Z=        | mean collision frequency [/s]                                          |
+| =C_s-at-Z=       | speed of sound [m/s]                                                   |
+| =mu-at-Z=        | dynamic viscosity [N.s/m^{2}]                                          |
+| =mu/mu_0-at-Z=   | dynamic viscosity / sea level dynamic viscosity                        |
+| =eta-at-Z=       | kinematic viscosity [m^{2}/s] (note: not /nu/ as is more common)       |
+| =eta/eta_0-at-Z= | kinematic viscosity / sea level kinematic viscosity                    |
+| =k_t-at-Z=       | thermal conductivity [W/m.K]                                           |
+| =k_t/k_t0-at-Z=  | thermal conductivity / sea level thermal conductivity                  |
+|------------------+------------------------------------------------------------------------|
+
+There is a similar function in each case that takes geopotential altitude, H, instead of geometric
+altitude, Z: =g-at-H=, =M-over-M_0-at-H=, etc.
+
+* IMPLEMENTATION
+
+In the atmosphere model specified by this standard, the properties below 86 km altitude, i.e., below
+the mesopause, are given by closed form formulas that assume constant composition and specified
+temperature lapse rates in 7 altitude zones.  Above 86 km, more complicated processes are included.
+Accounting for these requires doing some integrations.  Rather than perform these integrations each
+time a property is requested, the code here pre-calculates a number of parameters, primarily the
+number density of various species as functions of altitude, using numerical integration.  This allow
+more efficient access to all the specified properties in this region.  This pre-calculated data is
+held in a =USSADATA= structure.  The variable =*USSADATA*= contains such a structure and is used by
+the various property functions.  The default value in this variable is created with an altitude
+resolution of 10 meters.  This makes for a lot of fixed data, but then properties returned by the
+various functions are very close to those tabulated in the standard.  Of course, the actual atmosphere
+is not constant to 5 or 6 signficant figures, so this much accuracy is hardly needed.  If memory is a
+problem, a much coarser altitude resolution, say 100 or even 1000 meters could be used.  This can be
+changed by changing the default value put into =*USSADATA*= in the file =cl-ussa1976.lisp=.  Macro
+=WITH-USSADATA= can be used to experiment with an appropriate resolution.
+
+* VALIDATION
+
+Package "=TEST-CL-USSA1976=" in the =test= subdirectory contains functions that generate data
+in the same format as tables in the standard.  Spot checks of this output with the standard's
+values indicate some differences in the least signficant figure.  I have not found any obvious
+reason for these differences.  Obviously, such small variations are well below those in the
+real atmosphere.
+
+Note that some values in the tables in the standard for altitudes between 80 and 86 km are
+not corrected for the small changes in molecular weight suggested in section 1.2.4, Table 8 of
+the standard.  The values produced by the functions in this package do have this correction,
+so are slightly different from the values in the tables in the standard in this region.
+
+Note, also, that in a number of cases in the tables in the standard, the headers of columns Z and H
+are switched.  Also in Table II, the exponent of thermal conductivity, k, should be -2 not -5.  See
+the corrigenda at the beginning of the standard for details.
+
+* LICENSE
+
+MIT.  See file =LICENSE=, which should have been provided.
